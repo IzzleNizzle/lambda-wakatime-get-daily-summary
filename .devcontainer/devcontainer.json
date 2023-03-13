@@ -1,0 +1,50 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+	"name": "Python 3",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/python:0-3.11",
+	"runArgs": [
+        "--env-file",
+        ".devcontainer/devcontainer.env"
+    ],
+	"onCreateCommand": {
+        "installLint": "pip install flake8",
+        "installFormatter": "pip install black",
+        "installDeps": "pip install -r ${containerWorkspaceFolder}/app/requirements.txt",
+        "terraformAutocomplete": "terraform -install-autocomplete"
+    },
+	"features": {
+		"ghcr.io/devcontainers/features/aws-cli:1": {},
+		"ghcr.io/devcontainers/features/terraform:1": {}
+	},
+	"customizations": {
+        "vscode": {
+            "settings": {
+                "python.formatting.provider": "black",
+                "editor.detectIndentation": false,
+                "editor.formatOnSave": true,
+                "editor.insertSpaces": true,
+                "editor.tabSize": 4,
+                "python.linting.flake8Enabled": true,
+                // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-length
+                "python.linting.flake8Args": [
+                    "--ignore=E203",
+                    "--max-line-length=88"
+                ],
+                "[dockercompose]": {
+                    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+                }
+            },
+            "extensions": [
+                "WakaTime.vscode-wakatime",
+                "ms-azuretools.vscode-docker",
+                "ms-python.python"
+            ]
+        }
+    },
+    "remoteEnv": {
+        "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
+        "WAKATIME_API_KEY": "${localEnv:WAKATIME_API_KEY}"
+    }
+}
