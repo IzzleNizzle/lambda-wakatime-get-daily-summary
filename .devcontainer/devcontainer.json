@@ -1,24 +1,25 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
-	"name": "Python 3",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/python:0-3.11",
-	"runArgs": [
+    "name": "Python 3",
+    // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+    "image": "mcr.microsoft.com/devcontainers/python:0-3.11",
+    "runArgs": [
         "--env-file",
         ".devcontainer/devcontainer.env"
     ],
-	"onCreateCommand": {
+    "onCreateCommand": {
         "installLint": "pip install flake8",
         "installFormatter": "pip install black",
+        "installAwsSamCli": "pip install aws-sam-cli",
         "installDeps": "pip install -r ${containerWorkspaceFolder}/app/requirements.txt",
         "terraformAutocomplete": "terraform -install-autocomplete"
     },
-	"features": {
-		"ghcr.io/devcontainers/features/aws-cli:1": {},
-		"ghcr.io/devcontainers/features/terraform:1": {}
-	},
-	"customizations": {
+    "features": {
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/devcontainers/features/terraform:1": {}
+    },
+    "customizations": {
         "vscode": {
             "settings": {
                 "python.formatting.provider": "black",
