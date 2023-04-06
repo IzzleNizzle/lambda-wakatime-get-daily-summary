@@ -10,3 +10,9 @@ https://wakatime.com/developers#authentication
 ### Build Step Helper
 Using the XC Build Tool
 https://github.com/joerdav/xc
+
+### Trying out github actions to AWS lambda
+
+following this guide: https://aws.amazon.com/blogs/compute/using-github-actions-to-deploy-serverless-applications/
+
+`sam init -r python3.9 -n lambda-wakatime-get-daily-summary --app-template "hello-world"`

@@ -18,6 +18,10 @@ def lambda_handler(event, context):
     daily_average = data["daily_average"]["text"]
     daily_average_seconds = data["daily_average"]["seconds"]
 
+    leaderboard_data = wakatime_api_get_leader_rank()
+
+    user_leaderboard_rank = leaderboard_data["current_user"]["rank"]
+
     post_response = notion_api_create_db_page(
         start_date,
         end_date,
@@ -25,6 +29,7 @@ def lambda_handler(event, context):
         weekly_total_seconds,
         daily_average,
         daily_average_seconds,
+        user_leaderboard_rank,
     )
     response_json = {
         "statusCode": post_response.status_code,
@@ -47,6 +52,13 @@ def wakatime_api_get_summary(start_date, end_date):
     return data
 
 
+def wakatime_api_get_leader_rank():
+    url = f"https://wakatime.com/api/v1/leaders?country_code=US&api_key={WAKATIME_API_KEY}"
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+
 def notion_api_create_db_page(
     start_date,
     end_date,
@@ -54,6 +66,7 @@ def notion_api_create_db_page(
     weekly_total_seconds,
     daily_average,
     daily_average_seconds,
+    user_leaderboard_rank,
 ):
     post_data = {
         "parent": {"database_id": NOTION_DATABASE_ID},
@@ -98,6 +111,7 @@ def notion_api_create_db_page(
                 ]
             },
             "Daily Average (seconds)": {"number": daily_average_seconds},
+            "Leaderboard Rank": {"number": user_leaderboard_rank},
             "Date": {"date": {"start": end_date}},
         },
     }
