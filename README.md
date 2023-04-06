@@ -1,6 +1,17 @@
 # lambda-wakatime-get-daily-summary
 Cloud Function (Lambda) - Grab wakatime daily summary and save. For tracking my ouput
 
+
+### Build zip for lambda:
+
+```
+pip install --target ./package requests==2.28.2
+cd package
+zip -r ../hello_world.zip .
+cd ..
+zip hello_world.zip app.py
+```
+
 ### Reference URL's
 
 Wakatime Documentation:
