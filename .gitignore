@@ -1,5 +1,6 @@
 devcontainer.env
 token.json
+lambda_bundle.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

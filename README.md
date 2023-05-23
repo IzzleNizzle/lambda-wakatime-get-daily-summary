@@ -29,4 +29,5 @@ cd package
 zip -r ../lambda_bundle.zip .
 cd ../app
 zip ../lambda_bundle.zip app.py token.json
+rm -rf ../package
 ```
