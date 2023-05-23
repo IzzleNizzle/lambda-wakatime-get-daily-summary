@@ -10,7 +10,7 @@ NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 WAKATIME_API_KEY = os.environ.get("WAKATIME_API_KEY")
 CREDENTIALS_FILE = os.environ.get("CREDENTIALS_FILE")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
-SHEET_NAME = os.environ.get("SHEET_NAME")
+SHEET_RANGE = os.environ.get("SHEET_RANGE")
 
 
 def lambda_handler(event, context):
@@ -25,7 +25,6 @@ def lambda_handler(event, context):
 
     leaderboard_data = wakatime_api_get_leader_rank()
     leaderboard_100_data = wakatime_api_get_leader_rank(leaderboard_page=0)
-
     user_leaderboard_rank = leaderboard_data["current_user"]["rank"]
     top_100_leaderboard_total = leaderboard_100_data["data"][99]["running_total"][
         "human_readable_total"
@@ -56,7 +55,7 @@ def lambda_handler(event, context):
 
     google_sheet_response = append_values_to_google_sheet(
         SPREADSHEET_ID,
-        SHEET_NAME,
+        SHEET_RANGE,
         "USER_ENTERED",
         sheet_values,
     )
