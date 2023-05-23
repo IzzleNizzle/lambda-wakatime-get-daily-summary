@@ -27,16 +27,16 @@ def lambda_handler(event, context):
     leaderboard_100_data = wakatime_api_get_leader_rank(leaderboard_page=0)
     user_leaderboard_rank = leaderboard_data["current_user"]["rank"]
     top_100_leaderboard_total = leaderboard_100_data["data"][99]["running_total"][
-        "human_readable_total"
+        "total_seconds"
     ]
     top_100_leaderboard_daily_average = leaderboard_100_data["data"][99][
         "running_total"
-    ]["human_readable_daily_average"]
+    ]["daily_average"]
     top_10_leaderboard_total = leaderboard_100_data["data"][9]["running_total"][
-        "human_readable_total"
+        "total_seconds"
     ]
     top_10_leaderboard_daily_average = leaderboard_100_data["data"][9]["running_total"][
-        "human_readable_daily_average"
+        "daily_average"
     ]
 
     sheet_values = [
