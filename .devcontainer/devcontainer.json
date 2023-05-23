@@ -40,7 +40,8 @@
             "extensions": [
                 "WakaTime.vscode-wakatime",
                 "ms-azuretools.vscode-docker",
-                "ms-python.python"
+                "ms-python.python",
+                "ms-python.black-formatter"
             ]
         }
     },

@@ -1,11 +1,16 @@
 import os
 from datetime import datetime, timedelta
-import json
 import requests
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 WAKATIME_API_KEY = os.environ.get("WAKATIME_API_KEY")
+CREDENTIALS_FILE = os.environ.get("CREDENTIALS_FILE")
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
+SHEET_NAME = os.environ.get("SHEET_NAME")
 
 
 def lambda_handler(event, context):
@@ -19,10 +24,23 @@ def lambda_handler(event, context):
     daily_average_seconds = data["daily_average"]["seconds"]
 
     leaderboard_data = wakatime_api_get_leader_rank()
+    leaderboard_100_data = wakatime_api_get_leader_rank(leaderboard_page=0)
 
     user_leaderboard_rank = leaderboard_data["current_user"]["rank"]
+    top_100_leaderboard_total = leaderboard_100_data["data"][99]["running_total"][
+        "human_readable_total"
+    ]
+    top_100_leaderboard_daily_average = leaderboard_100_data["data"][99][
+        "running_total"
+    ]["human_readable_daily_average"]
+    top_10_leaderboard_total = leaderboard_100_data["data"][9]["running_total"][
+        "human_readable_total"
+    ]
+    top_10_leaderboard_daily_average = leaderboard_100_data["data"][9]["running_total"][
+        "human_readable_daily_average"
+    ]
 
-    post_response = notion_api_create_db_page(
+    sheet_values = [
         start_date,
         end_date,
         weekly_total,
@@ -30,10 +48,24 @@ def lambda_handler(event, context):
         daily_average,
         daily_average_seconds,
         user_leaderboard_rank,
+        top_10_leaderboard_total,
+        top_10_leaderboard_daily_average,
+        top_100_leaderboard_total,
+        top_100_leaderboard_daily_average,
+    ]
+
+    google_sheet_response = append_values_to_google_sheet(
+        SPREADSHEET_ID,
+        SHEET_NAME,
+        "USER_ENTERED",
+        sheet_values,
     )
+
     response_json = {
-        "statusCode": post_response.status_code,
-        "body": post_response.text,
+        "statusCode": 200,
+        "body": {
+            "sheets_api_response": google_sheet_response,
+        },
     }
     print(response_json)
     return response_json
@@ -46,86 +78,59 @@ def get_7_day_range(end_date):
 
 
 def wakatime_api_get_summary(start_date, end_date):
-    url = f"https://wakatime.com/api/v1/users/current/summaries?start={start_date}&end={end_date}&api_key={WAKATIME_API_KEY}"
-    response = requests.get(url)
-    data = response.json()
-    return data
-
-
-def wakatime_api_get_leader_rank():
-    url = f"https://wakatime.com/api/v1/leaders?country_code=US&api_key={WAKATIME_API_KEY}"
-    response = requests.get(url)
-    data = response.json()
-    return data
-
-
-def notion_api_create_db_page(
-    start_date,
-    end_date,
-    weekly_total,
-    weekly_total_seconds,
-    daily_average,
-    daily_average_seconds,
-    user_leaderboard_rank,
-):
-    post_data = {
-        "parent": {"database_id": NOTION_DATABASE_ID},
-        "icon": {"emoji": "🧑‍💻"},
-        "properties": {
-            "Name": {"title": [{"text": {"content": f"{start_date} to {end_date}"}}]},
-            "Weekly Total": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": weekly_total, "link": None},
-                        "annotations": {
-                            "bold": False,
-                            "italic": False,
-                            "strikethrough": False,
-                            "underline": False,
-                            "code": False,
-                            "color": "default",
-                        },
-                        "plain_text": weekly_total,
-                        "href": None,
-                    },
-                ]
-            },
-            "Weekly Total (seconds)": {"number": weekly_total_seconds},
-            "Daily Average": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": daily_average, "link": None},
-                        "annotations": {
-                            "bold": False,
-                            "italic": False,
-                            "strikethrough": False,
-                            "underline": False,
-                            "code": False,
-                            "color": "default",
-                        },
-                        "plain_text": daily_average,
-                        "href": None,
-                    },
-                ]
-            },
-            "Daily Average (seconds)": {"number": daily_average_seconds},
-            "Leaderboard Rank": {"number": user_leaderboard_rank},
-            "Date": {"date": {"start": end_date}},
-        },
-    }
-    headers = {
-        "Authorization": f"Bearer {NOTION_API_KEY}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28",
-    }
-    post_response = requests.post(
-        "https://api.notion.com/v1/pages",
-        data=json.dumps(post_data),
-        headers=headers,
+    url = (
+        f"https://wakatime.com/api/v1/users/current/summaries"
+        f"?start={start_date}&end={end_date}&api_key={WAKATIME_API_KEY}"
     )
-    return post_response
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+
+def wakatime_api_get_leader_rank(leaderboard_page=None):
+    url = (
+        f"https://wakatime.com/api/v1/leaders"
+        f"?country_code=US&api_key={WAKATIME_API_KEY}"
+    )
+    if leaderboard_page is not None:
+        url += f"&page={leaderboard_page}"
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+
+def append_values_to_google_sheet(
+    spreadsheet_id,
+    range_name,
+    value_input_option,
+    values,
+):
+    if CREDENTIALS_FILE is None:
+        raise ValueError("Environment variable not set")
+    current_file_path = os.path.abspath(__file__)
+    relative_file_path = os.path.join(
+        os.path.dirname(current_file_path), CREDENTIALS_FILE
+    )
+    creds = service_account.Credentials.from_service_account_file(relative_file_path)
+    try:
+        service = build("sheets", "v4", credentials=creds)
+        body = {"values": [values]}
+        result = (
+            service.spreadsheets()
+            .values()
+            .append(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption=value_input_option,
+                body=body,
+            )
+            .execute()
+        )
+        print(f"{result.get('updatedCells')} cells updated.")
+        return result
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return error
 
 
 if __name__ == "__main__":
