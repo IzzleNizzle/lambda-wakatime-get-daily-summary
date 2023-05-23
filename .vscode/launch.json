@@ -5,6 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "aws-sam",
+            "request": "direct-invoke",
+            "name": "Invoke Lambda",
+            "invokeTarget": {
+                "target": "code",
+                "lambdaHandler": "app.lambda_handler",
+                "projectRoot": "${workspaceFolder}/build"
+            },
+            "lambda": {
+                "runtime": "python3.9",
+                "payload": {
+                    "json": {}
+                },
+                "environmentVariables": {
+                    "WAKATIME_API_KEY": "",
+                    "CREDENTIALS_FILE": "",
+                    "SPREADSHEET_ID": "",
+                    "SHEET_RANGE": "A1:B2"
+                }
+            }
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
