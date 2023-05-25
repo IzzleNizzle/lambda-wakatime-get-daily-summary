@@ -11,10 +11,47 @@ WAKATIME_API_KEY = os.environ.get("WAKATIME_API_KEY")
 CREDENTIALS_FILE = os.environ.get("CREDENTIALS_FILE")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 SHEET_RANGE = os.environ.get("SHEET_RANGE")
+STEAM_KEY = os.environ.get("STEAM_KEY")
+STEAM_CLIENT_ID = os.environ.get("STEAM_CLIENT_ID")
 
 
+selected_keys = ['name', 'playtime_forever', 'playtime_2weeks']  # Replace with the keys you want to save
+
+
+def steam_data_extract_game_time(my_objects):
+    new_objects = []
+    for obj in my_objects:
+        new_obj = {}
+        for key in selected_keys:
+            if key in obj:
+                new_obj[key] = obj[key]
+            else:
+                new_obj[key] = 0
+        new_objects.append(new_obj)
+    return new_objects
+
+def steam_data_prepare_for_sheets(data_dict):
+    # Convert dictionary to array with specific keys
+    return [data_dict['name'], data_dict['playtime_forever'], data_dict['playtime_2weeks']]
+
+
+'Steam-play-data'
 def lambda_handler(event, context):
     start_date, end_date = get_7_day_range(datetime.now())
+
+    steam_play_data = steam_api_get_owned_games()
+
+    steam_play_data = steam_data_extract_game_time(steam_play_data['response']['games'])
+
+    steam_play_data_sheets_ready = list(map(steam_data_prepare_for_sheets, steam_play_data))
+
+    append_values_to_google_sheet(
+        SPREADSHEET_ID,
+        SHEET_RANGE,
+        "USER_ENTERED",
+        steam_play_data_sheets_ready,
+    )
+
 
     data = wakatime_api_get_summary(start_date, end_date)
 
@@ -80,6 +117,15 @@ def wakatime_api_get_summary(start_date, end_date):
     url = (
         f"https://wakatime.com/api/v1/users/current/summaries"
         f"?start={start_date}&end={end_date}&api_key={WAKATIME_API_KEY}"
+    )
+    response = requests.get(url)
+    data = response.json()
+    return data
+
+def steam_api_get_owned_games():
+    url = (
+        f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
+        f"?key={STEAM_KEY}&steamid={STEAM_CLIENT_ID}&format=json&include_appinfo=true"
     )
     response = requests.get(url)
     data = response.json()
