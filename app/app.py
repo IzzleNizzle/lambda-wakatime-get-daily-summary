@@ -13,45 +13,26 @@ SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 SHEET_RANGE = os.environ.get("SHEET_RANGE")
 STEAM_KEY = os.environ.get("STEAM_KEY")
 STEAM_CLIENT_ID = os.environ.get("STEAM_CLIENT_ID")
+STEAM_DATA_SHEET_RANGE = os.environ.get("STEAM_DATA_SHEET_RANGE")
 
 
-selected_keys = ['name', 'playtime_forever', 'playtime_2weeks']  # Replace with the keys you want to save
-
-
-def steam_data_extract_game_time(my_objects):
-    new_objects = []
-    for obj in my_objects:
-        new_obj = {}
-        for key in selected_keys:
-            if key in obj:
-                new_obj[key] = obj[key]
-            else:
-                new_obj[key] = 0
-        new_objects.append(new_obj)
-    return new_objects
-
-def steam_data_prepare_for_sheets(data_dict):
-    # Convert dictionary to array with specific keys
-    return [data_dict['name'], data_dict['playtime_forever'], data_dict['playtime_2weeks']]
-
-
-'Steam-play-data'
 def lambda_handler(event, context):
     start_date, end_date = get_7_day_range(datetime.now())
 
     steam_play_data = steam_api_get_owned_games()
 
-    steam_play_data = steam_data_extract_game_time(steam_play_data['response']['games'])
+    steam_play_data = steam_data_extract_game_time(steam_play_data["response"]["games"])
 
-    steam_play_data_sheets_ready = list(map(steam_data_prepare_for_sheets, steam_play_data))
+    steam_play_data_list = list(map(steam_data_prepare_for_sheets, steam_play_data))
+
+    steam_play_data_sheets_ready = join_data_arrays(steam_play_data_list)
 
     append_values_to_google_sheet(
         SPREADSHEET_ID,
-        SHEET_RANGE,
+        STEAM_DATA_SHEET_RANGE,
         "USER_ENTERED",
-        steam_play_data_sheets_ready,
+        [steam_play_data_sheets_ready],
     )
-
 
     data = wakatime_api_get_summary(start_date, end_date)
 
@@ -94,7 +75,7 @@ def lambda_handler(event, context):
         SPREADSHEET_ID,
         SHEET_RANGE,
         "USER_ENTERED",
-        sheet_values,
+        [sheet_values],
     )
 
     response_json = {
@@ -122,6 +103,7 @@ def wakatime_api_get_summary(start_date, end_date):
     data = response.json()
     return data
 
+
 def steam_api_get_owned_games():
     url = (
         f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
@@ -144,6 +126,35 @@ def wakatime_api_get_leader_rank(leaderboard_page=None):
     return data
 
 
+def steam_data_extract_game_time(my_objects):
+    selected_keys = ["name", "playtime_forever", "playtime_2weeks"]
+    new_objects = []
+    for obj in my_objects:
+        new_obj = {}
+        for key in selected_keys:
+            if key in obj:
+                new_obj[key] = obj[key]
+            else:
+                new_obj[key] = 0
+        new_objects.append(new_obj)
+    return new_objects
+
+
+def steam_data_prepare_for_sheets(data_dict):
+    return [
+        data_dict["name"],
+        data_dict["playtime_forever"],
+        data_dict["playtime_2weeks"],
+    ]
+
+
+def join_data_arrays(arrays):
+    joined_array = []
+    for array in arrays:
+        joined_array += array
+    return joined_array
+
+
 def append_values_to_google_sheet(
     spreadsheet_id,
     range_name,
@@ -159,7 +170,7 @@ def append_values_to_google_sheet(
     creds = service_account.Credentials.from_service_account_file(relative_file_path)
     try:
         service = build("sheets", "v4", credentials=creds)
-        body = {"values": [values]}
+        body = {"values": values}
         result = (
             service.spreadsheets()
             .values()
