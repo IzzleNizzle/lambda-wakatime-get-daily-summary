@@ -57,6 +57,20 @@ def lambda_handler(event, context):
         "daily_average"
     ]
 
+    top_100_leaderboard_total_readable = leaderboard_100_data["data"][99][
+        "running_total"
+    ]["human_readable_total"]
+    top_100_leaderboard_daily_average_readable = leaderboard_100_data["data"][99][
+        "running_total"
+    ]["human_readable_daily_average"]
+
+    top_10_leaderboard_total_readable = leaderboard_100_data["data"][9][
+        "running_total"
+    ]["human_readable_total"]
+    top_10_leaderboard_daily_average_readable = leaderboard_100_data["data"][9][
+        "running_total"
+    ]["human_readable_daily_average"]
+
     sheet_values = [
         start_date,
         end_date,
@@ -69,6 +83,10 @@ def lambda_handler(event, context):
         top_10_leaderboard_daily_average,
         top_100_leaderboard_total,
         top_100_leaderboard_daily_average,
+        top_100_leaderboard_total_readable,
+        top_100_leaderboard_daily_average_readable,
+        top_10_leaderboard_total_readable,
+        top_10_leaderboard_daily_average_readable,
     ]
 
     google_sheet_response = append_values_to_google_sheet(
@@ -184,6 +202,68 @@ def append_values_to_google_sheet(
         )
         print(f"{result.get('updatedCells')} cells updated.")
         return result
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return error
+
+
+def google_sheet_insert_row(
+    values=[[]],
+    spreadsheet_id=SPREADSHEET_ID,
+    sheet_id=0,
+):
+    if CREDENTIALS_FILE is None:
+        raise ValueError("Environment variable not set")
+    current_file_path = os.path.abspath(__file__)
+    relative_file_path = os.path.join(
+        os.path.dirname(current_file_path), CREDENTIALS_FILE
+    )
+    creds = service_account.Credentials.from_service_account_file(relative_file_path)
+    try:
+        service = build("sheets", "v4", credentials=creds)
+
+        request = {
+            "requests": [
+                {
+                    "insertDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": 0,
+                            "endIndex": len(values),
+                        },
+                        "inheritFromBefore": False,
+                    }
+                },
+                {
+                    "updateCells": {
+                        "rows": [
+                            {
+                                "values": [
+                                    {
+                                        "userEnteredValue": {"stringValue": value},
+                                        "userEnteredFormat": {
+                                            "wrapStrategy": "OVERFLOW_CELL"
+                                        },
+                                    }
+                                    for value in row
+                                ]
+                            }
+                            for row in values
+                        ],
+                        "fields": "*",
+                        "start": {"sheetId": sheet_id, "rowIndex": 0},
+                    }
+                },
+            ]
+        }
+        response = (
+            service.spreadsheets()
+            .batchUpdate(spreadsheetId=spreadsheet_id, body=request)
+            .execute()
+        )
+        print(f"{response} cells updated.")
+        return response
     except HttpError as error:
         print(f"An error occurred: {error}")
         return error
