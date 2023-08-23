@@ -8,12 +8,13 @@ from googleapiclient.errors import HttpError
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 WAKATIME_API_KEY = os.environ.get("WAKATIME_API_KEY")
+WAKATIME_ALL_TIME_SHEET_ID = os.environ.get("WAKATIME_ALL_TIME_SHEET_ID")
 CREDENTIALS_FILE = os.environ.get("CREDENTIALS_FILE")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
-SHEET_RANGE = os.environ.get("SHEET_RANGE")
+WAKATIME_WEEKLY_SHEET_ID = os.environ.get("WAKATIME_WEEKLY_SHEET_ID")
 STEAM_KEY = os.environ.get("STEAM_KEY")
 STEAM_CLIENT_ID = os.environ.get("STEAM_CLIENT_ID")
-STEAM_DATA_SHEET_RANGE = os.environ.get("STEAM_DATA_SHEET_RANGE")
+STEAM_PLAY_DATA_SHEET_ID = os.environ.get("STEAM_PLAY_DATA_SHEET_ID")
 
 
 def lambda_handler(event, context):
@@ -27,11 +28,8 @@ def lambda_handler(event, context):
 
     steam_play_data_sheets_ready = join_data_arrays(steam_play_data_list)
 
-    append_values_to_google_sheet(
-        SPREADSHEET_ID,
-        STEAM_DATA_SHEET_RANGE,
-        "USER_ENTERED",
-        [steam_play_data_sheets_ready],
+    steam_data_append_request_obj = list_of_values_to_append_request_obj(
+        steam_play_data_sheets_ready, STEAM_PLAY_DATA_SHEET_ID
     )
 
     data = wakatime_api_get_summary(start_date, end_date)
@@ -89,11 +87,31 @@ def lambda_handler(event, context):
         top_10_leaderboard_daily_average_readable,
     ]
 
-    google_sheet_response = append_values_to_google_sheet(
-        SPREADSHEET_ID,
-        SHEET_RANGE,
-        "USER_ENTERED",
-        [sheet_values],
+    wakatime_weekly_append_request_obj = list_of_values_to_append_request_obj(
+        sheet_values, WAKATIME_WEEKLY_SHEET_ID
+    )
+
+    all_time_data = wakatime_api_all_time_count()
+    all_time_seconds = all_time_data["all_time_seconds"]
+    all_time_text = all_time_data["all_time_text"]
+    print(f"all_time_seconds: {all_time_seconds}, all_time_text: {all_time_text}")
+
+    wakatime_all_time_data_list = [
+        all_time_seconds,
+        all_time_text,
+        start_date,
+    ]
+
+    wakatime_all_time_append_request_obj = list_of_values_to_append_request_obj(
+        wakatime_all_time_data_list, WAKATIME_ALL_TIME_SHEET_ID
+    )
+
+    google_sheet_response = batch_update_google_sheets(
+        [
+            steam_data_append_request_obj,
+            wakatime_weekly_append_request_obj,
+            wakatime_all_time_append_request_obj,
+        ]
     )
 
     response_json = {
@@ -142,6 +160,24 @@ def wakatime_api_get_leader_rank(leaderboard_page=None):
     response = requests.get(url)
     data = response.json()
     return data
+
+
+def wakatime_api_all_time_count():
+    all_time_url = (
+        f"https://wakatime.com/api/v1/users/current/all_time_since_today"
+        f"?country_code=US&api_key={WAKATIME_API_KEY}"
+    )
+    print(f"all_time_url: {all_time_url}")
+    all_time_response = requests.get(all_time_url)
+    all_time_data = all_time_response.json()
+    print(f"all_time_data: {all_time_data}")
+
+    all_time_seconds = all_time_data["data"]["total_seconds"]
+    all_time_text = all_time_data["data"]["text"]
+    return {
+        "all_time_seconds": all_time_seconds,
+        "all_time_text": all_time_text,
+    }
 
 
 def steam_data_extract_game_time(my_objects):
@@ -267,6 +303,65 @@ def google_sheet_insert_row(
     except HttpError as error:
         print(f"An error occurred: {error}")
         return error
+
+
+def batch_update_google_sheets(
+    requests=[{}],
+    spreadsheet_id=SPREADSHEET_ID,
+):
+    if CREDENTIALS_FILE is None:
+        raise ValueError("Environment variable not set")
+    current_file_path = os.path.abspath(__file__)
+    relative_file_path = os.path.join(
+        os.path.dirname(current_file_path), CREDENTIALS_FILE
+    )
+    creds = service_account.Credentials.from_service_account_file(relative_file_path)
+    try:
+        service = build("sheets", "v4", credentials=creds)
+        body = {
+            "requests": requests,
+        }
+        response = (
+            service.spreadsheets()
+            .batchUpdate(spreadsheetId=spreadsheet_id, body=body)
+            .execute()
+        )
+        print(f"{response} cells updated.")
+        return response
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return error
+
+
+def list_of_values_to_append_request_obj(list_values, sheet_id):
+    data_row_values = [create_string_value_obj(val) for val in list_values]
+    data_row_data = create_rowdata(data_row_values)
+    data_append_request_obj = create_append_request_obj(sheet_id, data_row_data)
+    return data_append_request_obj
+
+
+def create_append_request_obj(sheet_id, row_data):
+    return {
+        "appendCells": {
+            "sheetId": sheet_id,
+            "rows": [
+                row_data,
+            ],
+            "fields": "*",
+        },
+    }
+
+
+def create_rowdata(column_values):
+    return {"values": [value for value in column_values]}
+
+
+def create_string_value_obj(val):
+    return {
+        "userEnteredValue": {
+            "stringValue": str(val),
+        },
+    }
 
 
 if __name__ == "__main__":
